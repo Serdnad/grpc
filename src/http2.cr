@@ -663,7 +663,7 @@ module HTTP2
     def send(headers : HTTP::Headers, body : Bytes, trailers : HTTP::Headers? = nil)
       stream = connection.stream(next_stream_id!)
 
-      puts "CLIENT: SEND #{headers} #{body} #{trailers}"
+      # puts "CLIENT: SEND #{headers} #{body} #{trailers}"
 
       stream.send Frame::Headers.new(
         stream_id: stream.id,
