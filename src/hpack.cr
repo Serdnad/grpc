@@ -29,6 +29,8 @@ module HTTP2
       end
 
       def decode(bytes, headers = HTTP::Headers.new)
+        # puts "DECODING! #{headers}"
+
         @reader = SliceReader.new(bytes)
         decoded_common_headers = false
 
@@ -74,16 +76,21 @@ module HTTP2
       end
 
       protected def indexed(index)
+        # pp "index: #{index}"
         if 0 < index < STATIC_TABLE_SIZE
           return STATIC_TABLE[index - 1]
         end
 
         if header = table[index - STATIC_TABLE_SIZE - 1]?
+          pp "header: #{header}"
           return header
         end
 
+        pp "INVALID INDEX: #{index}"
+
         pp index: index, static_size: STATIC_TABLE_SIZE, dynamic_size: table.size
 
+        pp "INVALID INDEX: #{index}"
         raise Error.new("invalid index: #{index}")
       end
 
@@ -133,6 +140,7 @@ module HTTP2
       end
 
       def encode(headers : HTTP::Headers, indexing = default_indexing, huffman = default_huffman, @writer = IO::Memory.new)
+        # puts "ENCODING! #{headers} - #{huffman}"
         headers.each { |name, values| encode(name.downcase, values, indexing, huffman) if name.starts_with?(':') }
         headers.each { |name, values| encode(name.downcase, values, indexing, huffman) unless name.starts_with?(':') }
         writer.to_slice

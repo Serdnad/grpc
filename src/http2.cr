@@ -244,7 +244,7 @@ module HTTP2
       end
 
       def read(bytes : Bytes)
-        @body.read_fully bytes
+        @body.read bytes
       end
 
       def write(bytes : Bytes) : Nil
@@ -310,6 +310,11 @@ module HTTP2
     def path : String
       headers[":path"]
     end
+
+    def content_type : String
+      headers["content-type"]
+    end
+
   end
 
   class Connection
@@ -327,7 +332,7 @@ module HTTP2
     @send_buffer = Channel(Frame).new(32)
     @socket : IO
     @streams = Hash(UInt32, Stream).new
-    @hpack_encoder = HPACK::Encoder.new(huffman: true)
+    @hpack_encoder = HPACK::Encoder.new(huffman: false)
     @hpack_decoder = HPACK::Decoder.new
     @read_mutex = Mutex.new
     @write_mutex = Mutex.new
@@ -342,7 +347,7 @@ module HTTP2
     def start_server(&block : Connection, Stream, Frame ->)
       spawn do
         bytes = Bytes.new(PREFACE.bytesize)
-        @socket.read_fully(bytes)
+        @socket.read(bytes)
 
         if bytes == PREFACE
           loop do
@@ -491,6 +496,10 @@ module HTTP2
           @connection.delete_stream id
         else
           # Do we need to do anything here?
+
+          @state = State::Closed
+          @connection.delete_stream id
+
         end
       end
 
@@ -604,7 +613,7 @@ module HTTP2
       params = settings.params
 
       # oh god the namespacing here is probably gonna be too much
-      if params.has_key? Frame::Settings::Parameter::EnablePush
+      if params.has_key?(Frame::Settings::Parameter::EnablePush)
         @push_enabled = params[Frame::Settings::Parameter::EnablePush] != 0
       end
 
@@ -654,6 +663,8 @@ module HTTP2
     def send(headers : HTTP::Headers, body : Bytes, trailers : HTTP::Headers? = nil)
       stream = connection.stream(next_stream_id!)
 
+      puts "CLIENT: SEND #{headers} #{body} #{trailers}"
+
       stream.send Frame::Headers.new(
         stream_id: stream.id,
         flags: trailers ? Frame::Flags::None : Frame::Flags::EndHeaders,
@@ -676,10 +687,16 @@ module HTTP2
         sleep 100.microseconds
       end
 
-      Server::Response.new(
+      # sleep 2.seconds
+
+      r = Server::Response.new(
         headers: stream.headers,
         body: stream.data,
       )
+
+      # pp r
+
+      r
     end
 
     @connection_lock = Mutex.new
